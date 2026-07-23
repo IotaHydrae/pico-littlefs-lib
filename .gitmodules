@@ -1,0 +1,6 @@
+[submodule "lib/littlefs"]
+	path = lib/littlefs
+	url = https://github.com/littlefs-project/littlefs
+[submodule "lib/sdcard-lib"]
+	path = lib/sdcard-lib
+	url = https://github.com/IotaHydrae/pico-sdcard-lib
