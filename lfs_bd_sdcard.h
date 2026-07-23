@@ -1,0 +1,99 @@
+/*
+ * lfs_bd_sdcard — LittleFS Block Device for SPI SD Cards
+ *
+ * Maps littlefs read / prog / erase / sync onto sd_read_block() /
+ * sd_write_block() calls.
+ *
+ * ## Typical usage
+ *
+ *     #include "lfs_bd_sdcard.h"
+ *     #include "lfs.h"
+ *
+ *     static lfs_bd_sdcard_t bd;
+ *     static struct lfs_config cfg;
+ *     static lfs_t lfs;
+ *
+ *     // Initialise SD card hardware first
+ *     int err = sd_init();
+ *
+ *     // Wire up littlefs → SD card
+ *     err = lfs_bd_sdcard_init(&cfg, &bd);
+ *
+ *     // Format (first use only)
+ *     err = lfs_format(&lfs, &cfg);
+ *
+ *     // Mount
+ *     err = lfs_mount(&lfs, &cfg);
+ *
+ * ## Geometry
+ *
+ *   read_size  = 512   (SD sector size)
+ *   prog_size  = 512
+ *   block_size = 4096  (8 sectors — tradeoff between metadata overhead
+ *                        and RAM usage)
+ *
+ *   cache_size defaults to block_size.  You can override it (and
+ *   optionally provide static buffers) by modifying cfg fields after
+ *   lfs_bd_sdcard_init() returns but before calling lfs_format() /
+ *   lfs_mount().
+ *
+ * ## SD-card erase
+ *
+ * SD cards do not need explicit erase-before-write, so the erase
+ * callback is a no-op.  This is fine for littlefs — it just means
+ * wear-levelling decisions are made solely by the card's internal
+ * controller.
+ */
+
+#ifndef LFS_BD_SDCARD_H
+#define LFS_BD_SDCARD_H
+
+#include "lfs.h"
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* --------------------------------------------------------------------------
+ * Backend instance
+ * -------------------------------------------------------------------------- */
+
+typedef struct lfs_bd_sdcard {
+    /* Number of SD sectors per littlefs block.
+     * Derived from block_size / 512 at init time. */
+    uint32_t sectors_per_block;
+
+    /* Total number of SD sectors available for the filesystem.
+     * Set to 0 to use all sectors (up to UINT32_MAX / 512 blocks). */
+    uint32_t sector_count_limit;
+
+    /* Starting sector offset on the card.
+     * Usually 0 (use entire card).  Set to a non-zero value to place
+     * the filesystem after an MBR / partition table. */
+    uint32_t sector_offset;
+} lfs_bd_sdcard_t;
+
+/* --------------------------------------------------------------------------
+ * Init
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Populate *cfg so it is ready for lfs_format() or lfs_mount().
+ *
+ * @param cfg  Pointer to caller-owned lfs_config; all fields are written.
+ * @param bd   Pointer to caller-owned lfs_bd_sdcard_t; stored in cfg->context.
+ * @return LFS_ERR_OK on success.
+ *
+ * After this call you may tweak cfg->block_size, cfg->cache_size,
+ * cfg->lookahead_size, cfg->read_buffer, cfg->prog_buffer, or
+ * cfg->lookahead_buffer before formatting / mounting.
+ * lfs_bd_sdcard_init exports the default 4 KiB block geometry.
+ */
+int lfs_bd_sdcard_init(struct lfs_config *cfg, lfs_bd_sdcard_t *bd);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* LFS_BD_SDCARD_H */
