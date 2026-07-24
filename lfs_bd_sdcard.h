@@ -65,7 +65,8 @@ typedef struct lfs_bd_sdcard {
     uint32_t sectors_per_block;
 
     /* Total number of SD sectors available for the filesystem.
-     * Set to 0 to use all sectors (up to UINT32_MAX / 512 blocks). */
+     * Set to 0 to auto-detect via CSD (sd_get_sector_count).
+     * Set non-zero to override / clamp the capacity. */
     uint32_t sector_count_limit;
 
     /* Starting sector offset on the card.
