@@ -25,9 +25,9 @@ extern "C" {
  * The caller owns the storage; the backend init functions cast through
  * lfs_config.context. */
 typedef struct lfs_bd {
-    /* Backend-specific data — each implementation defines its own struct
+	/* Backend-specific data — each implementation defines its own struct
      * and stores a pointer in lfs_config.context. */
-    void *impl;
+	void *impl;
 } lfs_bd_t;
 
 #ifdef __cplusplus

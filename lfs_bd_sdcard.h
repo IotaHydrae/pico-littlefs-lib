@@ -65,15 +65,15 @@ extern "C" {
  * -------------------------------------------------------------------------- */
 
 typedef struct lfs_bd_sdcard {
-    /* Total number of SD sectors available for the filesystem.
+	/* Total number of SD sectors available for the filesystem.
      * Set to 0 to auto-detect via CSD (sd_get_sector_count).
      * Set non-zero to override / clamp the capacity. */
-    uint32_t sector_count_limit;
+	uint32_t sector_count_limit;
 
-    /* Starting sector offset on the card.
+	/* Starting sector offset on the card.
      * Usually 0 (use entire card).  Set to a non-zero value to place
      * the filesystem after an MBR / partition table. */
-    uint32_t sector_offset;
+	uint32_t sector_offset;
 } lfs_bd_sdcard_t;
 
 /* --------------------------------------------------------------------------
@@ -113,7 +113,7 @@ int lfs_bd_sdcard_init(struct lfs_config *cfg, lfs_bd_sdcard_t *bd);
  *         Other negative codes are passed through from lfs_mount().
  */
 int lfs_bd_sdcard_mount_auto(lfs_t *lfs, struct lfs_config *cfg,
-                             lfs_bd_sdcard_t *bd);
+			     lfs_bd_sdcard_t *bd);
 
 #ifdef __cplusplus
 }
