@@ -3,6 +3,11 @@
  *
  * Implementation: translates littlefs block-level I/O into SD-card
  * sector reads and writes via the platform-independent sdcard library.
+ *
+ * The read / prog callbacks use c->block_size at runtime (not a
+ * compile-time constant), so the same binary can mount filesystems
+ * formatted with different block sizes (e.g. 512 bytes by the PC
+ * littlefs-fuse tool, or 4096 bytes by this library's default).
  */
 
 #include "lfs_bd_sdcard.h"
@@ -14,39 +19,28 @@
  * Default geometry
  * ========================================================================= */
 
-#ifndef LFS_BD_SDCARD_BLOCK_SIZE
-#define LFS_BD_SDCARD_BLOCK_SIZE 4096
+#ifndef LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE
+#define LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE 4096
 #endif
 
-#ifndef LFS_BD_SDCARD_CACHE_SIZE
-#define LFS_BD_SDCARD_CACHE_SIZE 4096
+#ifndef LFS_BD_SDCARD_DEFAULT_CACHE_SIZE
+#define LFS_BD_SDCARD_DEFAULT_CACHE_SIZE 4096
 #endif
 
 /* =========================================================================
- * Helpers — convert littlefs (block, off) → SD sector address
- * ========================================================================= */
-
-static inline uint32_t lfs_block_to_sd_sector(const lfs_bd_sdcard_t *bd,
-                                               lfs_block_t block,
-                                               lfs_off_t off)
-{
-    /* block and off are in littlefs space (block_size granularity).
-     * Convert to absolute byte address then to SD-sector index. */
-    uint32_t byte_addr = (uint32_t)(block * LFS_BD_SDCARD_BLOCK_SIZE + off);
-    return bd->sector_offset + (byte_addr / 512);
-}
-
-/* =========================================================================
- * lfs_config callbacks
+ * lfs_config callbacks  (use c->block_size, not a compile-time constant)
  * ========================================================================= */
 
 static int bd_sdcard_read(const struct lfs_config *c, lfs_block_t block,
                           lfs_off_t off, void *buffer, lfs_size_t size)
 {
     lfs_bd_sdcard_t *bd = (lfs_bd_sdcard_t *)c->context;
-    uint32_t sector = lfs_block_to_sd_sector(bd, block, off);
-    uint32_t sectors = size / 512;
-    uint8_t *dst = (uint8_t *)buffer;
+
+    /* Convert littlefs (block, off) → absolute byte address → SD sector */
+    uint32_t byte_addr = (uint32_t)((uint64_t)block * c->block_size + off);
+    uint32_t sector    = bd->sector_offset + byte_addr / 512;
+    uint32_t sectors   = size / 512;
+    uint8_t *dst       = (uint8_t *)buffer;
 
     for (uint32_t i = 0; i < sectors; i++) {
         int err = sd_read_block(sector + i, dst + i * 512);
@@ -60,8 +54,10 @@ static int bd_sdcard_prog(const struct lfs_config *c, lfs_block_t block,
                           lfs_off_t off, const void *buffer, lfs_size_t size)
 {
     lfs_bd_sdcard_t *bd = (lfs_bd_sdcard_t *)c->context;
-    uint32_t sector = lfs_block_to_sd_sector(bd, block, off);
-    uint32_t sectors = size / 512;
+
+    uint32_t byte_addr = (uint32_t)((uint64_t)block * c->block_size + off);
+    uint32_t sector    = bd->sector_offset + byte_addr / 512;
+    uint32_t sectors   = size / 512;
     const uint8_t *src = (const uint8_t *)buffer;
 
     for (uint32_t i = 0; i < sectors; i++) {
@@ -102,7 +98,7 @@ int lfs_bd_sdcard_init(struct lfs_config *cfg, lfs_bd_sdcard_t *bd)
     /* ---- geometry --------------------------------------------------- */
     cfg->read_size  = 512;
     cfg->prog_size  = 512;
-    cfg->block_size = LFS_BD_SDCARD_BLOCK_SIZE;
+    cfg->block_size = LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE;
 
     /* Default block_count: query the card for its real capacity.
      * If sector_count_limit is non-zero it overrides the detected value.
@@ -114,10 +110,10 @@ int lfs_bd_sdcard_init(struct lfs_config *cfg, lfs_bd_sdcard_t *bd)
             total_sectors = 0xFFFFFFFF;  /* last-resort fallback */
     }
     uint32_t usable_sectors = total_sectors - bd->sector_offset;
-    cfg->block_count = usable_sectors / (LFS_BD_SDCARD_BLOCK_SIZE / 512);
+    cfg->block_count = usable_sectors / (cfg->block_size / 512);
 
     cfg->block_cycles = 500;
-    cfg->cache_size   = LFS_BD_SDCARD_CACHE_SIZE;
+    cfg->cache_size   = LFS_BD_SDCARD_DEFAULT_CACHE_SIZE;
     cfg->lookahead_size = 128;   /* track 1024 blocks at a time */
 
     /* ---- callbacks -------------------------------------------------- */
@@ -134,4 +130,75 @@ int lfs_bd_sdcard_init(struct lfs_config *cfg, lfs_bd_sdcard_t *bd)
      */
 
     return LFS_ERR_OK;
+}
+
+/* =========================================================================
+ * Geometry auto-detect
+ *
+ * Tries lfs_mount() with a sequence of common block sizes.  The first
+ * one that succeeds wins.  cfg->block_size, cfg->block_count, and
+ * cfg->cache_size are updated to match the on-disk geometry.
+ *
+ * This allows a Pico to mount a filesystem that was formatted on a PC
+ * with the littlefs-fuse tool (which uses block_size = 512), while
+ * still using the library's own default (4096) for new filesystems.
+ * ========================================================================= */
+
+int lfs_bd_sdcard_mount_auto(lfs_t *lfs, struct lfs_config *cfg,
+                             lfs_bd_sdcard_t *bd)
+{
+    /* Block sizes to probe — ordered by preference (our default first).
+     *   4096 = this library's default
+     *   512  = littlefs-fuse / lfs PC tool default (BLKSSZGET → sector size)
+     * Other common sizes for NOR flash etc. can be added here. */
+    static const lfs_size_t probes[] = {4096, 512, 131072, 32768};
+    static const int        nprobes  = sizeof(probes) / sizeof(probes[0]);
+
+    /* Save the caller's preferred geometry */
+    lfs_size_t orig_block_size  = cfg->block_size;
+    lfs_size_t orig_block_count = cfg->block_count;
+    lfs_size_t orig_cache_size  = cfg->cache_size;
+
+    for (int i = 0; i < nprobes; i++) {
+        lfs_size_t bs = probes[i];
+
+        /* Derive geometry from the probe block size */
+        uint32_t total_sectors = bd->sector_count_limit;
+        if (total_sectors == 0) {
+            total_sectors = sd_get_sector_count();
+            if (total_sectors == 0)
+                total_sectors = 0xFFFFFFFF;
+        }
+        uint32_t usable_sectors = total_sectors - bd->sector_offset;
+
+        cfg->block_size  = bs;
+        cfg->block_count = usable_sectors / (bs / 512);
+        cfg->cache_size  = bs;  /* one block cache */
+
+        /* static buffers must be ≥ cache_size; the caller owns this check.
+         * If the probe block size is larger than the caller's buffers,
+         * skip it — lfs_mount would overflow the buffer. */
+        if (cfg->read_buffer && bs > orig_cache_size) continue;
+        if (cfg->prog_buffer && bs > orig_cache_size) continue;
+
+        int err = lfs_mount(lfs, cfg);
+        if (err == LFS_ERR_OK)
+            return LFS_ERR_OK;   /* mounted with probed geometry */
+
+        /* LFS_ERR_INVAL → geometry mismatch, try next size.
+         * Any other error (LFS_ERR_CORRUPT) → card genuinely not formatted;
+         * stop probing and restore the caller's defaults. */
+        if (err != LFS_ERR_INVAL) {
+            cfg->block_size  = orig_block_size;
+            cfg->block_count = orig_block_count;
+            cfg->cache_size  = orig_cache_size;
+            return err;
+        }
+    }
+
+    /* Nothing matched — restore defaults and report */
+    cfg->block_size  = orig_block_size;
+    cfg->block_count = orig_block_count;
+    cfg->cache_size  = orig_cache_size;
+    return LFS_ERR_INVAL;
 }

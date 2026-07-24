@@ -28,6 +28,8 @@
 #include "lfs.h"
 #include "lfs_bd_sdcard.h"
 #include "sdcard.h"
+#include "sdcard_port.h"
+#include "sdcard_port_pico.h"
 
 /* =========================================================================
  * Static buffers — avoid malloc in embedded context
@@ -96,7 +98,34 @@ int main(void) {
     int err = sd_init();
     if (err != SD_OK) {
         printf("  FAIL: %s (code %d)\n", sd_error_str(err), err);
-        printf("  Check wiring and that a card is inserted.\n");
+
+        /* ---- diagnostic: check if anything is on the SPI bus --------- */
+        printf("\n  --- SPI bus diagnostic ---\n");
+        printf("  Pins: MISO=GP%d MOSI=GP%d SCK=GP%d CS=GP%d\n",
+               SD_PORT_PICO_PIN_MISO, SD_PORT_PICO_PIN_MOSI,
+               SD_PORT_PICO_PIN_SCK,  SD_PORT_PICO_PIN_CS);
+
+        /* Send dummy clocks with CS high — MISO should read 0xFF if
+         * the card is present (DO held high by pull-up when idle).
+         * If MISO is always 0x00 there may be a short to GND.
+         * If MISO == MOSI (loopback), MISO and MOSI are bridged. */
+        printf("  Sending 16 dummy clocks (CS high) ...\n  ");
+        for (int i = 0; i < 16; i++) {
+            uint8_t b = sd_port_spi_rw(0xFF);
+            printf("%02X ", b);
+        }
+        printf("\n  (all 0xFF = bus idle / no card; "
+               "all 0x00 = possible short; "
+               "other = unexpected)\n");
+
+        printf("\n  Troubleshooting:\n");
+        printf("  - Is the SD card fully inserted?\n");
+        printf("  - Is the card formatted? (try another card)\n");
+        printf("  - Check 3.3V power (not 5V!) to the SD card\n");
+        printf("  - Verify wiring matches the pins above\n");
+        printf("  - Try the sdcard-lib's own demo to isolate:\n");
+        printf("    sudo picotool load -fx "
+               "./sdcard_lib_build/examples/pico/pico-sdcard-demo.uf2\n");
         while (1) sleep_ms(1000);
     }
     printf("  OK — %s, SPI %lu Hz\n\n",
@@ -128,16 +157,30 @@ int main(void) {
 
     /* ---- 3. Mount (format if needed) ---------------------------------- */
     printf("[3/5] Mounting filesystem ...\n");
-    err = lfs_mount(&lfs, &cfg);
 
-    if (err == LFS_ERR_CORRUPT) {
-        printf("  Filesystem not found or corrupted — formatting ...\n");
+    /* Try auto-detect first (handles PC-formatted cards with block_size=512
+     * and Pico-formatted cards with block_size=4096 seamlessly). */
+    err = lfs_bd_sdcard_mount_auto(&lfs, &cfg, &bd);
+
+    if (err == LFS_ERR_CORRUPT || err == LFS_ERR_INVAL) {
+        if (err == LFS_ERR_INVAL)
+            printf("  No matching geometry found — formatting ...\n");
+        else
+            printf("  Filesystem not found or corrupted — formatting ...\n");
+
+        /* Reset to our preferred defaults before formatting */
+        cfg.block_size  = 4096;
+        cfg.block_count = sd_get_sector_count() / (4096 / 512);
+        cfg.cache_size  = 4096;
+
         err = lfs_format(&lfs, &cfg);
         if (err != LFS_ERR_OK) {
             printf("  Format FAIL: %s (code %d)\n", lfs_err_str(err), err);
             while (1) sleep_ms(1000);
         }
-        printf("  Format OK.  Mounting again ...\n");
+        printf("  Format OK (block_size=%lu, block_count=%lu).\n",
+               (unsigned long)cfg.block_size, (unsigned long)cfg.block_count);
+        printf("  Mounting again ...\n");
         err = lfs_mount(&lfs, &cfg);
     }
 
@@ -145,7 +188,8 @@ int main(void) {
         printf("  Mount FAIL: %s (code %d)\n", lfs_err_str(err), err);
         while (1) sleep_ms(1000);
     }
-    printf("  Mounted OK.\n\n");
+    printf("  Mounted OK (block_size=%lu, block_count=%lu).\n\n",
+           (unsigned long)cfg.block_size, (unsigned long)cfg.block_count);
 
     /* ---- 4. File write + read test ------------------------------------ */
     printf("[4/5] File write / read test ...\n");

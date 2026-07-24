@@ -60,10 +60,6 @@ extern "C" {
  * -------------------------------------------------------------------------- */
 
 typedef struct lfs_bd_sdcard {
-    /* Number of SD sectors per littlefs block.
-     * Derived from block_size / 512 at init time. */
-    uint32_t sectors_per_block;
-
     /* Total number of SD sectors available for the filesystem.
      * Set to 0 to auto-detect via CSD (sd_get_sector_count).
      * Set non-zero to override / clamp the capacity. */
@@ -92,6 +88,27 @@ typedef struct lfs_bd_sdcard {
  * lfs_bd_sdcard_init exports the default 4 KiB block geometry.
  */
 int lfs_bd_sdcard_init(struct lfs_config *cfg, lfs_bd_sdcard_t *bd);
+
+/**
+ * Mount with automatic geometry detection.
+ *
+ * Tries lfs_mount() with a sequence of common block sizes (4096, 512,
+ * …).  The first size that mounts successfully is kept in cfg.
+ *
+ * This allows the same firmware to mount filesystems formatted by the
+ * PC littlefs-fuse tool (block_size = 512) as well as those formatted
+ * by this library (block_size = 4096).
+ *
+ * cfg must already be initialised by lfs_bd_sdcard_init().  Static
+ * buffers (read_buffer / prog_buffer) must be sized for the largest
+ * block size the caller wants to support.
+ *
+ * @return LFS_ERR_OK on success.
+ *         LFS_ERR_INVAL if no probed geometry matched.
+ *         Other negative codes are passed through from lfs_mount().
+ */
+int lfs_bd_sdcard_mount_auto(lfs_t *lfs, struct lfs_config *cfg,
+                             lfs_bd_sdcard_t *bd);
 
 #ifdef __cplusplus
 }
