@@ -53,18 +53,22 @@ void sd_port_cs_high(void) {
  * ========================================================================= */
 
 void sd_port_spi_init(uint32_t freq_hz) {
-    spi_init(SD_PORT_PICO_SPI, freq_hz);
-    spi_set_format(SD_PORT_PICO_SPI, 8,
-                   SPI_CPOL_0, SPI_CPHA_0,
-                   SPI_MSB_FIRST);
+    /* Pull CS HIGH first — if we configure SPI before CS, the card
+     * may see a floating/low CS and enter an unexpected state.
+     * This is especially important after a CPU reset (e.g. picotool
+     * reboot) where the card survived the reset but the Pico didn't. */
+    gpio_init(SD_PORT_PICO_PIN_CS);
+    gpio_set_dir(SD_PORT_PICO_PIN_CS, GPIO_OUT);
+    gpio_put(SD_PORT_PICO_PIN_CS, 1);        /* inactive */
 
     gpio_set_function(SD_PORT_PICO_PIN_MISO, GPIO_FUNC_SPI);
     gpio_set_function(SD_PORT_PICO_PIN_MOSI, GPIO_FUNC_SPI);
     gpio_set_function(SD_PORT_PICO_PIN_SCK,  GPIO_FUNC_SPI);
 
-    gpio_init(SD_PORT_PICO_PIN_CS);
-    gpio_set_dir(SD_PORT_PICO_PIN_CS, GPIO_OUT);
-    gpio_put(SD_PORT_PICO_PIN_CS, 1);        /* inactive */
+    spi_init(SD_PORT_PICO_SPI, freq_hz);
+    spi_set_format(SD_PORT_PICO_SPI, 8,
+                   SPI_CPOL_0, SPI_CPHA_0,
+                   SPI_MSB_FIRST);
 }
 
 uint32_t sd_port_spi_set_freq(uint32_t freq_hz) {
