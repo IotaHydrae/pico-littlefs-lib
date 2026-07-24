@@ -39,9 +39,9 @@ static lfs_bd_sdcard_t bd;
 static struct lfs_config cfg;
 static lfs_t lfs;
 
-/* littlefs cache buffers (16 KiB each = 1 block) */
-static uint8_t read_buffer[16384];
-static uint8_t prog_buffer[16384];
+/* littlefs cache buffers (one block each) */
+static uint8_t read_buffer[LFS_BD_SDCARD_DEFAULT_CACHE_SIZE];
+static uint8_t prog_buffer[LFS_BD_SDCARD_DEFAULT_CACHE_SIZE];
 static uint32_t lookahead_buffer[256 / sizeof(uint32_t)];
 
 /* =========================================================================
@@ -184,9 +184,10 @@ int main(void)
 			printf("  Filesystem not found or corrupted — formatting ...\n");
 
 		/* Reset to our preferred defaults before formatting */
-		cfg.block_size = 16384;
-		cfg.block_count = sd_get_sector_count() / (16384 / 512);
-		cfg.cache_size = 16384;
+		cfg.block_size = LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE;
+		cfg.block_count = sd_get_sector_count() /
+				  (LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE / 512);
+		cfg.cache_size = LFS_BD_SDCARD_DEFAULT_CACHE_SIZE;
 
 		err = lfs_format(&lfs, &cfg);
 		if (err != LFS_ERR_OK) {

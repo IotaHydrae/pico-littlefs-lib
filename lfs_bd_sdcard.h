@@ -53,6 +53,18 @@
 #ifndef LFS_BD_SDCARD_H
 #define LFS_BD_SDCARD_H
 
+/* --------------------------------------------------------------------------
+ * Default geometry (override via -D compiler flags)
+ * -------------------------------------------------------------------------- */
+
+#ifndef LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE
+#define LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE 16384
+#endif
+
+#ifndef LFS_BD_SDCARD_DEFAULT_CACHE_SIZE
+#define LFS_BD_SDCARD_DEFAULT_CACHE_SIZE 16384
+#endif
+
 #include "lfs.h"
 #include <stdint.h>
 

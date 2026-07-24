@@ -49,8 +49,8 @@ static lfs_bd_sdcard_t bd;
 static struct lfs_config cfg;
 static lfs_t lfs;
 
-static uint8_t read_buffer[16384];
-static uint8_t prog_buffer[16384];
+static uint8_t read_buffer[LFS_BD_SDCARD_DEFAULT_CACHE_SIZE];
+static uint8_t prog_buffer[LFS_BD_SDCARD_DEFAULT_CACHE_SIZE];
 static uint32_t lookahead_buffer[256 / sizeof(uint32_t)];
 static uint8_t chunk[CHUNK_SIZE];
 

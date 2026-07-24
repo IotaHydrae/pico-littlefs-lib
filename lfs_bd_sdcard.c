@@ -21,18 +21,6 @@
 #define LFS_BD_TRACE 0
 
 /* =========================================================================
- * Default geometry
- * ========================================================================= */
-
-#ifndef LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE
-#define LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE 16384
-#endif
-
-#ifndef LFS_BD_SDCARD_DEFAULT_CACHE_SIZE
-#define LFS_BD_SDCARD_DEFAULT_CACHE_SIZE 16384
-#endif
-
-/* =========================================================================
  * lfs_config callbacks  (use c->block_size, not a compile-time constant)
  * ========================================================================= */
 
@@ -223,10 +211,11 @@ int lfs_bd_sdcard_mount_auto(lfs_t *lfs, struct lfs_config *cfg,
 		if (err == LFS_ERR_OK)
 			return LFS_ERR_OK; /* mounted with probed geometry */
 
-		/* LFS_ERR_INVAL → geometry mismatch, try next size.
-         * Any other error → card genuinely not formatted;
-         * stop probing and restore the caller's defaults. */
-		if (err != LFS_ERR_INVAL) {
+		/* LFS_ERR_INVAL / LFS_ERR_CORRUPT during a probe
+		 * both mean "this block_size doesn't match".  CORRUPT
+		 * is expected because the wrong block_size reads the
+		 * wrong sector range.  Only hard I/O errors stop. */
+		if (err != LFS_ERR_INVAL && err != LFS_ERR_CORRUPT) {
 			cfg->block_size = orig_block_size;
 			cfg->block_count = orig_block_count;
 			cfg->cache_size = orig_cache_size;
