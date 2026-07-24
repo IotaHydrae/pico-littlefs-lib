@@ -75,6 +75,12 @@ uint32_t sd_port_spi_set_freq(uint32_t freq_hz) {
     return spi_set_baudrate(SD_PORT_PICO_SPI, freq_hz);
 }
 
+uint32_t sd_port_spi_high_freq(void) {
+    /* SD cards support up to 25 MHz in SPI mode.  We use 20 MHz for a
+     * safe margin; boards with short traces can raise this to 25 MHz. */
+    return 20000000;
+}
+
 /* =========================================================================
  * Timing
  * ========================================================================= */
