@@ -181,12 +181,15 @@ int lfs_bd_sdcard_mount_auto(lfs_t *lfs, struct lfs_config *cfg,
         if (cfg->read_buffer && bs > orig_cache_size) continue;
         if (cfg->prog_buffer && bs > orig_cache_size) continue;
 
+        /* A failed lfs_mount() can leave stale caches in lfs_t
+         * that confuse the next probe — start fresh each time. */
+        memset(lfs, 0, sizeof(*lfs));
         int err = lfs_mount(lfs, cfg);
         if (err == LFS_ERR_OK)
             return LFS_ERR_OK;   /* mounted with probed geometry */
 
         /* LFS_ERR_INVAL → geometry mismatch, try next size.
-         * Any other error (LFS_ERR_CORRUPT) → card genuinely not formatted;
+         * Any other error → card genuinely not formatted;
          * stop probing and restore the caller's defaults. */
         if (err != LFS_ERR_INVAL) {
             cfg->block_size  = orig_block_size;
