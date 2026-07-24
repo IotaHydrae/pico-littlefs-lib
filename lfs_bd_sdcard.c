@@ -55,14 +55,14 @@ static int bd_sdcard_read(const struct lfs_config *c, lfs_block_t block,
                block, off, size, c->block_size, sector, sectors);
     }
 
-    for (uint32_t i = 0; i < sectors; i++) {
-        int err = sd_read_block(sector + i, dst + i * 512);
-        if (err != SD_OK) {
-            if (LFS_BD_TRACE)
-                printf("  [rd] sd_read_block(%" PRIu32 ") FAIL err=%d\n",
-                       sector + i, err);
-            return LFS_ERR_IO;
-        }
+    /* Use multi-block read (CMD18) for consecutive sectors — pays the
+     * card's ~10 ms access latency once instead of per sector. */
+    int err = sd_read_blocks(sector, dst, sectors);
+    if (err != SD_OK) {
+        if (LFS_BD_TRACE)
+            printf("  [rd] sd_read_blocks(%" PRIu32 ", %" PRIu32
+                   ") FAIL err=%d\n", sector, sectors, err);
+        return LFS_ERR_IO;
     }
 
     return LFS_ERR_OK;
