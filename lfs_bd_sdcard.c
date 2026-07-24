@@ -104,11 +104,15 @@ int lfs_bd_sdcard_init(struct lfs_config *cfg, lfs_bd_sdcard_t *bd)
     cfg->prog_size  = 512;
     cfg->block_size = LFS_BD_SDCARD_BLOCK_SIZE;
 
-    /* Default block_count: use the whole (remaining) card.
-     * Caller can clamp this to a smaller value after init. */
-    uint32_t total_sectors = bd->sector_count_limit
-                                 ? bd->sector_count_limit
-                                 : 0xFFFFFFFF;  /* "as many as fit" */
+    /* Default block_count: query the card for its real capacity.
+     * If sector_count_limit is non-zero it overrides the detected value.
+     * Falls back to a conservative maximum if the card can't be queried. */
+    uint32_t total_sectors = bd->sector_count_limit;
+    if (total_sectors == 0) {
+        total_sectors = sd_get_sector_count();
+        if (total_sectors == 0)
+            total_sectors = 0xFFFFFFFF;  /* last-resort fallback */
+    }
     uint32_t usable_sectors = total_sectors - bd->sector_offset;
     cfg->block_count = usable_sectors / (LFS_BD_SDCARD_BLOCK_SIZE / 512);
 
