@@ -20,11 +20,11 @@
  * ========================================================================= */
 
 #ifndef LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE
-#define LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE 4096
+#define LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE 512
 #endif
 
 #ifndef LFS_BD_SDCARD_DEFAULT_CACHE_SIZE
-#define LFS_BD_SDCARD_DEFAULT_CACHE_SIZE 4096
+#define LFS_BD_SDCARD_DEFAULT_CACHE_SIZE 512
 #endif
 
 /* =========================================================================

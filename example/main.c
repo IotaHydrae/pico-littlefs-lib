@@ -169,9 +169,9 @@ int main(void) {
             printf("  Filesystem not found or corrupted — formatting ...\n");
 
         /* Reset to our preferred defaults before formatting */
-        cfg.block_size  = 4096;
-        cfg.block_count = sd_get_sector_count() / (4096 / 512);
-        cfg.cache_size  = 4096;
+        cfg.block_size  = 512;
+        cfg.block_count = sd_get_sector_count() / (512 / 512);
+        cfg.cache_size  = 512;
 
         err = lfs_format(&lfs, &cfg);
         if (err != LFS_ERR_OK) {

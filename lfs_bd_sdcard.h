@@ -29,8 +29,9 @@
  *
  *   read_size  = 512   (SD sector size)
  *   prog_size  = 512
- *   block_size = 4096  (8 sectors — tradeoff between metadata overhead
- *                        and RAM usage)
+ *   block_size = 512   (matches PC littlefs-fuse default for cross-
+ *                        platform compatibility; override via cfg
+ *                        after init if you prefer larger blocks)
  *
  *   cache_size defaults to block_size.  You can override it (and
  *   optionally provide static buffers) by modifying cfg fields after
