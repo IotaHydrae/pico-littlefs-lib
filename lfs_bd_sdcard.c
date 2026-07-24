@@ -20,11 +20,11 @@
  * ========================================================================= */
 
 #ifndef LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE
-#define LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE 512
+#define LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE 4096
 #endif
 
 #ifndef LFS_BD_SDCARD_DEFAULT_CACHE_SIZE
-#define LFS_BD_SDCARD_DEFAULT_CACHE_SIZE 512
+#define LFS_BD_SDCARD_DEFAULT_CACHE_SIZE 4096
 #endif
 
 /* =========================================================================
@@ -114,7 +114,7 @@ int lfs_bd_sdcard_init(struct lfs_config *cfg, lfs_bd_sdcard_t *bd)
 
     cfg->block_cycles = 500;
     cfg->cache_size   = LFS_BD_SDCARD_DEFAULT_CACHE_SIZE;
-    cfg->lookahead_size = 128;   /* track 1024 blocks at a time */
+    cfg->lookahead_size = 256;   /* track 2048 blocks at a time */
 
     /* ---- callbacks -------------------------------------------------- */
     cfg->context = bd;

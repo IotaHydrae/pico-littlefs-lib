@@ -42,7 +42,7 @@ static lfs_t lfs;
 /* littlefs cache buffers (4 KiB each = 1 block) */
 static uint8_t read_buffer[4096];
 static uint8_t prog_buffer[4096];
-static uint32_t lookahead_buffer[128 / sizeof(uint32_t)];
+static uint32_t lookahead_buffer[256 / sizeof(uint32_t)];
 
 /* =========================================================================
  * Helpers
@@ -169,9 +169,9 @@ int main(void) {
             printf("  Filesystem not found or corrupted — formatting ...\n");
 
         /* Reset to our preferred defaults before formatting */
-        cfg.block_size  = 512;
-        cfg.block_count = sd_get_sector_count() / (512 / 512);
-        cfg.cache_size  = 512;
+        cfg.block_size  = 4096;
+        cfg.block_count = sd_get_sector_count() / (4096 / 512);
+        cfg.cache_size  = 4096;
 
         err = lfs_format(&lfs, &cfg);
         if (err != LFS_ERR_OK) {

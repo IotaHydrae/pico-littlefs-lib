@@ -29,14 +29,20 @@
  *
  *   read_size  = 512   (SD sector size)
  *   prog_size  = 512
- *   block_size = 512   (matches PC littlefs-fuse default for cross-
- *                        platform compatibility; override via cfg
- *                        after init if you prefer larger blocks)
+ *   block_size = 4096  (8 sectors — better metadata performance and
+ *                        lower lookahead pressure on large cards;
+ *                        set to 512 via cfg after init if you need
+ *                        cross-compatibility with PC littlefs-fuse
+ *                        without command-line flags)
  *
- *   cache_size defaults to block_size.  You can override it (and
- *   optionally provide static buffers) by modifying cfg fields after
- *   lfs_bd_sdcard_init() returns but before calling lfs_format() /
- *   lfs_mount().
+ *   cache_size defaults to block_size.  Override after init but
+ *   before lfs_format() / lfs_mount().
+ *
+ * ## PC cross-mounting
+ *
+ *   Pico → PC:  ./lfs --block_size=4096 /dev/sda mount
+ *   PC  → Pico: lfs_bd_sdcard_mount_auto() detects block_size=512
+ *               automatically (formatted with ./lfs --format /dev/sda)
  *
  * ## SD-card erase
  *
