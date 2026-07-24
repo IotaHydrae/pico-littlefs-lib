@@ -25,11 +25,11 @@
  * ========================================================================= */
 
 #ifndef LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE
-#define LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE 4096
+#define LFS_BD_SDCARD_DEFAULT_BLOCK_SIZE 16384
 #endif
 
 #ifndef LFS_BD_SDCARD_DEFAULT_CACHE_SIZE
-#define LFS_BD_SDCARD_DEFAULT_CACHE_SIZE 4096
+#define LFS_BD_SDCARD_DEFAULT_CACHE_SIZE 16384
 #endif
 
 /* =========================================================================
@@ -181,7 +181,7 @@ int lfs_bd_sdcard_mount_auto(lfs_t *lfs, struct lfs_config *cfg,
      *   4096 = this library's default
      *   512  = littlefs-fuse / lfs PC tool default (BLKSSZGET → sector size)
      * Other common sizes for NOR flash etc. can be added here. */
-    static const lfs_size_t probes[] = {4096, 512, 131072, 32768};
+    static const lfs_size_t probes[] = {16384, 4096, 512, 32768, 131072};
     static const int        nprobes  = sizeof(probes) / sizeof(probes[0]);
 
     /* Save the caller's preferred geometry */
