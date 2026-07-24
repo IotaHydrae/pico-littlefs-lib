@@ -13,7 +13,12 @@
 #include "lfs_bd_sdcard.h"
 #include "sdcard.h"
 
+#include <inttypes.h>
+#include <stdio.h>
 #include <string.h>
+
+/* Set to 1 to print every block-device I/O call (verbose debug). */
+#define LFS_BD_TRACE 0
 
 /* =========================================================================
  * Default geometry
@@ -36,15 +41,28 @@ static int bd_sdcard_read(const struct lfs_config *c, lfs_block_t block,
 {
     lfs_bd_sdcard_t *bd = (lfs_bd_sdcard_t *)c->context;
 
-    /* Convert littlefs (block, off) → absolute byte address → SD sector */
-    uint32_t byte_addr = (uint32_t)((uint64_t)block * c->block_size + off);
-    uint32_t sector    = bd->sector_offset + byte_addr / 512;
+    /* Convert littlefs (block, off) → absolute byte address → SD sector.
+     * Must use 64-bit for the byte address: block * block_size can exceed
+     * 4 GiB on SDHC/SDXC cards (e.g. block 8,413,785 × 512 = 4.3 GB). */
+    uint64_t byte_addr = (uint64_t)block * c->block_size + off;
+    uint32_t sector    = bd->sector_offset + (uint32_t)(byte_addr / 512);
     uint32_t sectors   = size / 512;
     uint8_t *dst       = (uint8_t *)buffer;
 
+    if (LFS_BD_TRACE) {
+        printf("  [rd] blk=%" PRIu32 " off=%" PRIu32 " size=%" PRIu32
+               " bs=%" PRIu32 " → sec=%" PRIu32 "+%" PRIu32 "\n",
+               block, off, size, c->block_size, sector, sectors);
+    }
+
     for (uint32_t i = 0; i < sectors; i++) {
         int err = sd_read_block(sector + i, dst + i * 512);
-        if (err != SD_OK) return LFS_ERR_IO;
+        if (err != SD_OK) {
+            if (LFS_BD_TRACE)
+                printf("  [rd] sd_read_block(%" PRIu32 ") FAIL err=%d\n",
+                       sector + i, err);
+            return LFS_ERR_IO;
+        }
     }
 
     return LFS_ERR_OK;
@@ -55,14 +73,26 @@ static int bd_sdcard_prog(const struct lfs_config *c, lfs_block_t block,
 {
     lfs_bd_sdcard_t *bd = (lfs_bd_sdcard_t *)c->context;
 
-    uint32_t byte_addr = (uint32_t)((uint64_t)block * c->block_size + off);
-    uint32_t sector    = bd->sector_offset + byte_addr / 512;
+    /* Must use 64-bit — see note in bd_sdcard_read above. */
+    uint64_t byte_addr = (uint64_t)block * c->block_size + off;
+    uint32_t sector    = bd->sector_offset + (uint32_t)(byte_addr / 512);
     uint32_t sectors   = size / 512;
     const uint8_t *src = (const uint8_t *)buffer;
 
+    if (LFS_BD_TRACE) {
+        printf("  [wr] blk=%" PRIu32 " off=%" PRIu32 " size=%" PRIu32
+               " bs=%" PRIu32 " → sec=%" PRIu32 "+%" PRIu32 "\n",
+               block, off, size, c->block_size, sector, sectors);
+    }
+
     for (uint32_t i = 0; i < sectors; i++) {
         int err = sd_write_block(sector + i, src + i * 512);
-        if (err != SD_OK) return LFS_ERR_IO;
+        if (err != SD_OK) {
+            if (LFS_BD_TRACE)
+                printf("  [wr] sd_write_block(%" PRIu32 ") FAIL err=%d\n",
+                       sector + i, err);
+            return LFS_ERR_IO;
+        }
     }
 
     return LFS_ERR_OK;
