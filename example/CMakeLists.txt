@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 
 add_executable(pico-littlefs-demo
     main.c
-    ${CMAKE_SOURCE_DIR}/sdcard_port_pico.c
+    ${CMAKE_CURRENT_LIST_DIR}/../sdcard_port_pico.c
 )
 
 target_link_libraries(pico-littlefs-demo
@@ -14,9 +14,9 @@ target_link_libraries(pico-littlefs-demo
 )
 
 target_include_directories(pico-littlefs-demo PRIVATE
-    ${CMAKE_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/lib/littlefs
-    ${CMAKE_SOURCE_DIR}/lib/sdcard-lib
+    ${CMAKE_CURRENT_LIST_DIR}/..
+    ${CMAKE_CURRENT_LIST_DIR}/../lib/littlefs
+    ${CMAKE_CURRENT_LIST_DIR}/../lib/sdcard-lib
 )
 
 pico_enable_stdio_usb(pico-littlefs-demo 1)
