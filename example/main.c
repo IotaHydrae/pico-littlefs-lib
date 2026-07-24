@@ -147,14 +147,6 @@ int main(void) {
     cfg.prog_buffer      = prog_buffer;
     cfg.lookahead_buffer = lookahead_buffer;
 
-    printf("  block_size:  %lu bytes\n", (unsigned long)cfg.block_size);
-    printf("  block_count: %lu\n",       (unsigned long)cfg.block_count);
-    printf("  cache_size:  %lu bytes\n", (unsigned long)cfg.cache_size);
-    printf("  read_size:   %lu bytes\n", (unsigned long)cfg.read_size);
-    printf("  prog_size:   %lu bytes\n", (unsigned long)cfg.prog_size);
-    printf("  → filesystem capacity: %lu KiB\n\n",
-           (unsigned long)(cfg.block_count * cfg.block_size / 1024));
-
     /* ---- 3. Mount (format if needed) ---------------------------------- */
     printf("[3/5] Mounting filesystem ...\n");
 
@@ -188,8 +180,13 @@ int main(void) {
         printf("  Mount FAIL: %s (code %d)\n", lfs_err_str(err), err);
         while (1) sleep_ms(1000);
     }
-    printf("  Mounted OK (block_size=%lu, block_count=%lu).\n\n",
+    printf("  Mounted OK (block_size=%lu, block_count=%lu).\n",
            (unsigned long)cfg.block_size, (unsigned long)cfg.block_count);
+    printf("  read_size:   %lu bytes\n", (unsigned long)cfg.read_size);
+    printf("  prog_size:   %lu bytes\n", (unsigned long)cfg.prog_size);
+    printf("  cache_size:  %lu bytes\n", (unsigned long)cfg.cache_size);
+    printf("  → filesystem capacity: %lu KiB\n\n",
+           (unsigned long)((uint64_t)cfg.block_count * cfg.block_size / 1024));
 
     /* ---- 4. File write + read test ------------------------------------ */
     printf("[4/5] File write / read test ...\n");
