@@ -4,60 +4,42 @@
 
 LittleFS port for the Raspberry Pi Pico (RP2040), built on the [Pico SDK](https://github.com/raspberrypi/pico-sdk).
 
-Currently supports **SPI SD cards** as the storage backend, with a clean block-device abstraction that makes it straightforward to add other backends (e.g. SPI NOR flash, raw NAND, QSPI PSRAM).
+Supports **SPI SD cards** and **SPI NOR flash** through a clean block-device abstraction — swap backends without touching application code.
 
 ## Features
 
 - **LittleFS v2.x** — power-fail resilient, wear-levelled filesystem
-- **SPI SD card** read / write via [`pico-sdcard-lib`](https://github.com/IotaHydrae/pico-sdcard-lib)
-- **Pluggable backend** — add SPI flash or other storage without touching existing code
-- **Zero heap allocation** — all buffers are statically allocated by the application
-- **4 KiB blocks** tuned for SD card sector geometry
+- **SPI SD card** backend via [`pico-sdcard-lib`](https://github.com/IotaHydrae/pico-sdcard-lib)
+- **SPI NOR flash** backend via [`pico-spi-flash-lib`](https://github.com/IotaHydrae/pico-spi-flash-lib)
+- **Pluggable backends** — add new storage without modifying existing code
+- **Zero heap allocation** — all buffers are statically allocated
+- **Automatic geometry detection** — mount PC-formatted cards seamlessly
 
 ## Project Structure
 
 ```
 pico-littlefs-lib/
-├── CMakeLists.txt                # top-level build
-├── lfs_bd.h                      # block-device abstraction
-├── lfs_bd_sdcard.h               # SD card backend (public API)
-├── lfs_bd_sdcard.c               # SD card backend (read / prog / erase / sync)
-├── pico_littlefs.h               # optional convenience wrapper
-├── pico_littlefs.c
-├── sdcard_port_pico.h            # Pico pin & SPI config (macro overrides)
-├── sdcard_port_pico.c            # hardware port (hardware_spi / hardware_gpio)
+├── CMakeLists.txt                  # top-level build
+├── lfs_bd.h                        # block-device abstraction
+├── lfs_bd_sdcard.h / .c            # SD card backend
+├── lfs_bd_flash.h / .c             # SPI NOR flash backend
+├── sdcard_port_pico.h / .c         # SD card hardware port
+├── flash_port_pico.h               # flash pin config
+├── pico_littlefs.h / .c            # optional convenience wrapper
 ├── example/
-│   ├── CMakeLists.txt
-│   └── main.c                    # full-featured demo
+│   ├── sdcard_demo.c               # SD card demo
+│   ├── sdcard_large_read.c         # SD card large-file read benchmark
+│   ├── flash_demo.c                # SPI flash demo
+│   └── CMakeLists.txt
 └── lib/
-    ├── littlefs/                 # upstream littlefs (git submodule)
-    └── sdcard-lib/               # upstream SD card library (git submodule)
-```
-
-## Wiring
-
-| Pico Pin | SD Card Pin | Signal | Notes |
-|----------|-------------|--------|-------|
-| GP16     | D0 / DO     | MISO   |       |
-| GP17     | D3 / CS     | CS     | Manual GPIO (not hardware SPI CS) |
-| GP18     | CLK / SCLK  | SCK    |       |
-| GP19     | CMD / DI    | MOSI   |       |
-| 3.3V OUT | VCC         | Power  | Do **not** use 5 V |
-| GND      | GND         | Ground |       |
-
-To change pin assignments, define the macros in `sdcard_port_pico.h` or pass them via compiler flags:
-
-```c
-#define SD_PORT_PICO_SPI      spi0
-#define SD_PORT_PICO_PIN_MISO 16
-#define SD_PORT_PICO_PIN_CS   17
-#define SD_PORT_PICO_PIN_SCK  18
-#define SD_PORT_PICO_PIN_MOSI 19
+    ├── littlefs/                   # upstream littlefs (git submodule)
+    ├── sdcard-lib/                 # SD card library (git submodule)
+    └── spi-flash-lib/              # SPI flash library (git submodule)
 ```
 
 ## Quick Start
 
-### 1. Clone & pull submodules
+### 1. Clone
 
 ```bash
 git clone --recurse-submodules https://github.com/IotaHydrae/pico-littlefs-lib.git
@@ -77,112 +59,99 @@ Requires `PICO_SDK_PATH` to point to a working Pico SDK checkout.
 ### 3. Flash
 
 ```bash
-sudo picotool load -fx ./example/pico-littlefs-demo.uf2
+# SD card demo
+sudo picotool load -fx ./example/pico-littlefs-sdcard-demo.uf2
+
+# SD card large-file read benchmark
+sudo picotool load -fx ./example/pico-littlefs-sdcard-large-read.uf2
+
+# SPI flash demo
+sudo picotool load -fx ./example/pico-littlefs-flash-demo.uf2
 ```
 
-### 4. Monitor serial output
+### 4. Monitor
 
 ```bash
 minicom -D /dev/ttyACM0
-# or
-cat /dev/ttyACM0
 ```
 
-## Demo Output
+## Wiring
 
-With an SDHC card inserted, you should see output similar to:
+### SD Card (SPI0: GP16–19)
 
-```
-========================================
-  pico-littlefs Demo (SPI SD Card)
-========================================
+| Pico Pin | SD Card Pin | Signal |
+|----------|-------------|--------|
+| GP16     | D0 / DO     | MISO   |
+| GP17     | D3 / CS     | CS     |
+| GP18     | CLK / SCLK  | SCK    |
+| GP19     | CMD / DI    | MOSI   |
+| 3.3V OUT | VCC         | Power  |
+| GND      | GND         | Ground |
 
-[1/5] Initialising SD card ...
-  OK — SDHC/SDXC, SPI 8928571 Hz
+### SPI Flash (SPI0: GP16–19, same bus OK with separate CS)
 
-[2/5] Configuring littlefs ...
-  block_size:  4096 bytes
-  block_count: 536870911
-  cache_size:  4096 bytes
-  read_size:   512 bytes
-  prog_size:   512 bytes
-  → filesystem capacity: 4194300 KiB
+| Pico Pin | Flash Pin  | Signal |
+|----------|-------------|--------|
+| GP16     | DI / IO1    | MISO   |
+| GP17     | /CS         | CS     |
+| GP18     | CLK         | SCK    |
+| GP19     | DO / IO0    | MOSI   |
+| 3.3V OUT | VCC         | Power  |
+| GND      | GND         | Ground |
 
-[3/5] Mounting filesystem ...
-  Filesystem not found or corrupted — formatting ...
-  Format OK.  Mounting again ...
-  Mounted OK.
-
-[4/5] File write / read test ...
-  Wrote 90 bytes to 'hello.txt'
-  Read 90 bytes: 'Hello from pico-littlefs on SPI SD card!
-littlefs is a power-fail resilient filesystem.
-'
-  Appended 33 bytes.
-
-  --- hello.txt contents ---
-  File size: 123 bytes
-  Hello from pico-littlefs on SPI SD card!
-littlefs is a power-fail resilient filesystem.
-Appended line — second write.
-  --- end of file ---
-
-[5/5] Listing root directory ...
-  d        0  .
-  d        0  ..
-  f      123  hello.txt
-  → 3 entries
-
-----------------------------------------
-Unmount: OK
-========================================
-  Demo complete.
-========================================
-```
+Override pin assignments in `sdcard_port_pico.h` / `flash_port_pico.h`.
 
 ## Architecture
-
-The library enforces a clean separation between **filesystem logic**, **block-device I/O**, and **hardware access**:
 
 ```
 your application
   │
-  ├── lfs.h                     ← littlefs core API
-  │     (format / mount / file I/O / directory)
+  ├── lfs.h                          ← littlefs core API
   │
-  ├── lfs_bd_sdcard.h           ← block-device backend
-  │     implements lfs_config {read, prog, erase, sync}
-  │     maps littlefs blocks → SD card sectors
+  ├── lfs_bd_sdcard.c                ← SD card backend
+  │     implements {read, prog, erase, sync}
+  │     maps littlefs blocks → SD sectors
+  │     calls sd_read_blocks() (CMD18 multi-block)
   │
-  └── sdcard.h / sdcard_port.h  ← SPI SD card protocol + port layer
-        └── sdcard_port_pico.c  ← Pico GPIO / SPI implementation
+  ├── lfs_bd_flash.c                 ← SPI flash backend
+  │     implements {read, prog, erase, sync}
+  │     maps littlefs blocks → byte addresses
+  │     calls spi_flash_read/write/erase_sector()
+  │
+  └── sdcard.h / flash.h             ← hardware libraries
+        └── *_port_pico.c            ← Pico SPI / GPIO
 ```
 
-`lfs_bd_sdcard.c` is a **concrete backend**. The `lfs_bd.h` header declares the generic abstraction — each backend is responsible for filling out a `struct lfs_config` with its own geometry and callbacks.
+## Backend Comparison
+
+| | SD Card | SPI NOR Flash |
+|---|---|---|
+| **Default block_size** | 16384 (32 sectors) | 4096 (sector size) |
+| **read/prog alignment** | 512 bytes | 1 byte |
+| **Erase** | no-op (card-managed) | `spi_flash_erase_sector()` |
+| **Read speed** | ~600 KiB/s (SPI) | ~1 MiB/s (QSPI) |
+| **Port file** | `sdcard_port_pico.c` | `flash_port_pico.c` |
 
 ## Configuration
 
-Default geometry (tuned for SD cards):
+Default geometry (override via compiler flags `-DLFS_BD_SDCARD_DEFAULT_BLOCK_SIZE=...`):
 
-| Field | Value | Notes |
-|-------|-------|-------|
-| `read_size` | 512 | SD sector size |
-| `prog_size` | 512 | SD sector size |
-| `block_size` | 4096 | 8 sectors per littlefs block |
-| `cache_size` | 4096 | one block cache |
-| `lookahead_size` | 128 B | tracks 1024 blocks |
-| `block_cycles` | 500 | wear-levelling threshold |
-
-After calling `lfs_bd_sdcard_init()`, you can override any of these fields on the `struct lfs_config` before calling `lfs_format()` or `lfs_mount()`.
+| Field | SD Card | Flash |
+|-------|---------|-------|
+| `block_size` | 16384 | 4096 |
+| `cache_size` | 16384 | 4096 |
+| `read_size` | 512 | 1 |
+| `prog_size` | 512 | 1 |
+| `lookahead_size` | 256 B | 256 B |
+| `block_cycles` | 500 | 500 |
 
 ### Static Buffers
 
-The example supplies its own read / program / lookahead buffers to avoid heap allocations:
-
 ```c
-static uint8_t read_buffer[4096];
-static uint8_t prog_buffer[4096];
-static uint32_t lookahead_buffer[128 / sizeof(uint32_t)];
+// Buffer sizes track the macro — change once in the header:
+static uint8_t read_buffer[LFS_BD_SDCARD_DEFAULT_CACHE_SIZE];
+static uint8_t prog_buffer[LFS_BD_SDCARD_DEFAULT_CACHE_SIZE];
+static uint32_t lookahead_buffer[256 / sizeof(uint32_t)];
 
 lfs_bd_sdcard_init(&cfg, &bd);
 cfg.read_buffer      = read_buffer;
@@ -192,12 +161,10 @@ cfg.lookahead_buffer = lookahead_buffer;
 
 ## API Usage
 
-Minimal example — format and mount a filesystem:
-
 ```c
 #include "lfs.h"
-#include "lfs_bd_sdcard.h"
-#include "sdcard.h"
+#include "lfs_bd_sdcard.h"  // or lfs_bd_flash.h
+#include "sdcard.h"          // or flash.h
 
 static lfs_bd_sdcard_t bd;
 static struct lfs_config cfg;
@@ -205,22 +172,16 @@ static lfs_t lfs;
 
 int main(void) {
     stdio_init_all();
+    sd_init();                           // 1. init hardware
+    lfs_bd_sdcard_init(&cfg, &bd);       // 2. wire littlefs
 
-    // 1. Bring up the hardware
-    sd_init();
-
-    // 2. Wire littlefs to the SD card
-    lfs_bd_sdcard_init(&cfg, &bd);
-
-    // 3. Format (first use) or mount
-    int err = lfs_mount(&lfs, &cfg);
+    int err = lfs_mount(&lfs, &cfg);     // 3. mount
     if (err == LFS_ERR_CORRUPT) {
-        lfs_format(&lfs, &cfg);
+        lfs_format(&lfs, &cfg);          //    format if needed
         lfs_mount(&lfs, &cfg);
     }
 
-    // 4. Use the filesystem
-    lfs_file_t file;
+    lfs_file_t file;                     // 4. use
     lfs_file_open(&lfs, &file, "data.bin",
                   LFS_O_WRONLY | LFS_O_CREAT);
     lfs_file_write(&lfs, &file, "hello", 5);
@@ -230,50 +191,130 @@ int main(void) {
 }
 ```
 
-## Adding a New Backend
+## Porting to a New Storage Device
 
-To support a different storage device (e.g. SPI NOR flash), create a new pair of files:
+Adding a new backend (e.g. NAND flash, eMMC, PSRAM) requires two files and zero changes to existing code:
+
+### 1. Create the backend header — `lfs_bd_<name>.h`
+
+```c
+#ifndef LFS_BD_MYDEVICE_H
+#define LFS_BD_MYDEVICE_H
+
+#include "lfs.h"
+#include <stdint.h>
+
+#ifndef LFS_BD_MYDEVICE_DEFAULT_BLOCK_SIZE
+#define LFS_BD_MYDEVICE_DEFAULT_BLOCK_SIZE 4096
+#endif
+
+typedef struct lfs_bd_mydevice {
+    uint32_t size_limit;    /* 0 = auto-detect */
+    uint32_t byte_offset;   /* usually 0 */
+} lfs_bd_mydevice_t;
+
+int lfs_bd_mydevice_init(struct lfs_config *cfg, lfs_bd_mydevice_t *bd);
+
+#endif
+```
+
+### 2. Implement the four callbacks — `lfs_bd_<name>.c`
+
+```c
+#include "lfs_bd_mydevice.h"
+#include "mydevice.h"   /* your hardware driver */
+
+static int bd_mydevice_read(const struct lfs_config *c, lfs_block_t block,
+                             lfs_off_t off, void *buffer, lfs_size_t size)
+{
+    lfs_bd_mydevice_t *bd = (lfs_bd_mydevice_t *)c->context;
+    uint32_t addr = bd->byte_offset + block * c->block_size + off;
+    return mydevice_read(addr, buffer, size) == OK ? LFS_ERR_OK : LFS_ERR_IO;
+}
+
+static int bd_mydevice_prog(const struct lfs_config *c, lfs_block_t block,
+                             lfs_off_t off, const void *buffer, lfs_size_t size)
+{
+    /* ... same pattern as read, but write ... */
+    return LFS_ERR_OK;
+}
+
+static int bd_mydevice_erase(const struct lfs_config *c, lfs_block_t block)
+{
+    /* Flash: call hardware erase.  SD/eMMC: no-op. */
+    return LFS_ERR_OK;
+}
+
+static int bd_mydevice_sync(const struct lfs_config *c)
+{
+    /* Flush caches if your writes are buffered, else no-op. */
+    return LFS_ERR_OK;
+}
+
+int lfs_bd_mydevice_init(struct lfs_config *cfg, lfs_bd_mydevice_t *bd)
+{
+    memset(cfg, 0, sizeof(*cfg));
+    cfg->read_size  = 1;         /* byte- or sector-aligned */
+    cfg->prog_size  = 1;         /* as above */
+    cfg->block_size = LFS_BD_MYDEVICE_DEFAULT_BLOCK_SIZE;
+    cfg->block_count = mydevice_total_bytes() / cfg->block_size;
+    cfg->block_cycles = 500;
+    cfg->cache_size = LFS_BD_MYDEVICE_DEFAULT_BLOCK_SIZE;
+    cfg->lookahead_size = 256;
+
+    cfg->context = bd;
+    cfg->read  = bd_mydevice_read;
+    cfg->prog  = bd_mydevice_prog;
+    cfg->erase = bd_mydevice_erase;
+    cfg->sync  = bd_mydevice_sync;
+    return LFS_ERR_OK;
+}
+```
+
+### 3. Hook into the build
+
+Add your `.c` to `pico_littlefs_bd` in the top-level `CMakeLists.txt`:
+
+```cmake
+target_sources(pico_littlefs_bd PRIVATE ${CMAKE_CURRENT_LIST_DIR}/lfs_bd_mydevice.c)
+```
+
+### Key decisions per storage type
+
+| | NOR Flash | SD/eMMC | NAND Flash |
+|---|---|---|---|
+| **read_size** | 1 (byte) | 512 (sector) | page size |
+| **prog_size** | 1 (byte) | 512 (sector) | page size |
+| **erase** | real | no-op | real |
+| **sync** | no-op | no-op | flush cache |
+| **block_size** | 4096 (sector) | 16384 (perf) | erase block |
+| **block_count** | total / block_size | sectors / (bs/512) | total / block_size |
+
+### Reference implementations
+
+- `lfs_bd_sdcard.c` — 512-byte sector I/O, CMD18 multi-block read, no-op erase
+- `lfs_bd_flash.c` — byte-level I/O, real erase, no-op sync
+
+## PC Cross-Mounting (SD Card)
 
 ```
-lfs_bd_spi_flash.h
-lfs_bd_spi_flash.c
+Pico-formatted → PC:  ./lfs --block_size=16384 /dev/sda mount
+PC-formatted   → Pico: auto-detected by lfs_bd_sdcard_mount_auto()
 ```
-
-Implement these callbacks (the signatures come from `struct lfs_config`):
-
-| Callback | Purpose |
-|----------|---------|
-| `read`  | Read `size` bytes from `block` at `off` into `buffer` |
-| `prog`  | Program `size` bytes to `block` at `off` from `buffer` |
-| `erase` | Erase `block` (can be no-op if the medium doesn't need it) |
-| `sync`  | Flush caches (can be no-op for synchronous media) |
-
-Provide an init function that fills out `struct lfs_config` with appropriate geometry and the callbacks above. No changes to `lfs_bd_sdcard.c`, `CMakeLists.txt`, or the example are required — just add your new source files and link them.
-
-## Memory Footprint
-
-```
-   text      data       bss       dec
-  78448         0     12224     90672   ( ≈ 88.5 KiB )
-```
-
-- **Flash**: ~77 KiB (littlefs core + SD library + demo app + Pico SDK)
-- **RAM**:  ~12 KiB (filesystem state + cache buffers + SDK)
-
-Well within the RP2040 2 MiB / 264 KiB budget.
 
 ## Dependencies
 
 | Component | Source |
 |-----------|--------|
 | [Pico SDK](https://github.com/raspberrypi/pico-sdk) | `$PICO_SDK_PATH` |
-| [littlefs](https://github.com/littlefs-project/littlefs) | git submodule `lib/littlefs` |
-| [pico-sdcard-lib](https://github.com/IotaHydrae/pico-sdcard-lib) | git submodule `lib/sdcard-lib` |
+| [littlefs](https://github.com/littlefs-project/littlefs) | `lib/littlefs` |
+| [pico-sdcard-lib](https://github.com/IotaHydrae/pico-sdcard-lib) | `lib/sdcard-lib` |
+| [pico-spi-flash-lib](https://github.com/IotaHydrae/pico-spi-flash-lib) | `lib/spi-flash-lib` |
 
 ## License
 
-This project is licensed under the MIT License — see [LICENSE](LICENSE).
-Copyright (c) 2025 Wooden Chair <hua.zheng@embeddedboys.com>.
+MIT — see [LICENSE](LICENSE). Copyright (c) 2025 Wooden Chair &lt;hua.zheng@embeddedboys.com&gt;.
 
 LittleFS is copyright (c) 2022 The LittleFS Authors (BSD 3-Clause).
 SD card library is copyright (c) 2025 Wooden Chair (MIT).
+SPI flash library is copyright (c) 2025 Wooden Chair (MIT).

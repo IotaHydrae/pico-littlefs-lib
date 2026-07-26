@@ -6,11 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 cd build && cmake -G Ninja .. && ninja                     # build
-sudo picotool load -fx ./example/pico-littlefs-demo.uf2    # flash
+sudo picotool load -fx ./example/pico-littlefs-sdcard-demo.uf2   # flash (SD)
+sudo picotool load -fx ./example/pico-littlefs-flash-demo.uf2    # flash (NOR)
 minicom -D /dev/ttyACM0                                    # serial monitor
 ```
 
-`PICO_SDK_PATH` must be set. Build outputs `example/pico-littlefs-demo.{elf,uf2}`. The build also produces the sdcard-lib's own demo at `sdcard_lib_build/examples/pico/pico-sdcard-demo.elf`.
+`PICO_SDK_PATH` must be set. Build outputs `example/pico-littlefs-sdcard-demo.{elf,uf2}`, `pico-littlefs-sdcard-large-read.{elf,uf2}`, and `pico-littlefs-flash-demo.{elf,uf2}`.
 
 ## Architecture — three strict layers
 
@@ -89,13 +90,14 @@ No changes to the example, the CMakeLists, or existing backends are required. Th
 ## CMake target layout
 
 ```
-pico_littlefs_core (STATIC)    — lfs.c + lfs_util.c, no deps
-pico_sdcard        (STATIC)    — sdcard.c, from lib/sdcard-lib/
-pico_littlefs_bd   (STATIC)    — lfs_bd_sdcard.c, links pico_sdcard + pico_littlefs_core
-pico-littlefs-demo (EXECUTABLE) — example/main.c + sdcard_port_pico.c, links the above
+pico_littlefs_core        (STATIC) — lfs.c + lfs_util.c, no deps
+pico_sdcard               (STATIC) — sdcard.c, from lib/sdcard-lib/
+pico_spi_flash            (STATIC) — flash.c + flash_nor.c, from lib/spi-flash-lib/
+pico_littlefs_bd          (STATIC) — lfs_bd_sdcard.c + lfs_bd_flash.c, links above
+pico-littlefs-sdcard-demo (EXEC)   — example/main.c + sdcard_port_pico.c
+pico-littlefs-sdcard-large-read (EXEC) — example/large_read.c
+pico-littlefs-flash-demo  (EXEC)   — example/flash_demo.c + flash_port_pico.c
 ```
-
-The sdcard-lib subdirectory also builds its own `pico-sdcard-demo` as a side effect (scenario B: submodule in a Pico project detects `pico_stdlib`), but this repo's own demo is `pico-littlefs-demo`.
 
 ## Key dependencies
 
