@@ -50,18 +50,26 @@ if(NOT TARGET pico_sdcard)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/sdcard-lib sdcard_lib_build)
 endif()
 
-# ---- library: block-device + SD backend --------------------------------
+# ---- library: spi-flash (from submodule, guarded against double-include) --
+if(NOT TARGET pico_spi_flash)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/spi-flash-lib spi_flash_lib_build)
+endif()
+
+# ---- library: block-device backends (SD + flash) -----------------------
 if(NOT TARGET pico_littlefs_bd)
     add_library(pico_littlefs_bd STATIC
         ${CMAKE_CURRENT_LIST_DIR}/lfs_bd_sdcard.c
+        ${CMAKE_CURRENT_LIST_DIR}/lfs_bd_flash.c
     )
     target_include_directories(pico_littlefs_bd PUBLIC
         ${CMAKE_CURRENT_LIST_DIR}
         ${CMAKE_CURRENT_LIST_DIR}/lib/littlefs
         ${CMAKE_CURRENT_LIST_DIR}/lib/sdcard-lib
+        ${CMAKE_CURRENT_LIST_DIR}/lib/spi-flash-lib
     )
     target_link_libraries(pico_littlefs_bd PUBLIC
         pico_sdcard
+        pico_spi_flash
         pico_littlefs_core
     )
 endif()
