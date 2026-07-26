@@ -4,3 +4,6 @@
 [submodule "lib/sdcard-lib"]
 	path = lib/sdcard-lib
 	url = https://github.com/IotaHydrae/pico-sdcard-lib
+[submodule "lib/spi-flash-lib"]
+	path = lib/spi-flash-lib
+	url = https://github.com/IotaHydrae/pico-spi-flash-lib
