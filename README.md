@@ -26,7 +26,7 @@ pico-littlefs-lib/
 ├── sdcard_port_pico.h / .c         # SD card hardware port
 ├── flash_port_pico.h               # flash pin config
 ├── pico_littlefs.h / .c            # optional convenience wrapper
-├── example/
+├── examples/
 │   ├── sdcard_demo.c               # SD card demo
 │   ├── sdcard_large_read.c         # SD card large-file read benchmark
 │   ├── flash_demo.c                # SPI flash demo
@@ -60,13 +60,13 @@ Requires `PICO_SDK_PATH` to point to a working Pico SDK checkout.
 
 ```bash
 # SD card demo
-sudo picotool load -fx ./example/pico-littlefs-sdcard-demo.uf2
+sudo picotool load -fx ./examples/pico-littlefs-sdcard-demo.uf2
 
 # SD card large-file read benchmark
-sudo picotool load -fx ./example/pico-littlefs-sdcard-large-read.uf2
+sudo picotool load -fx ./examples/pico-littlefs-sdcard-large-read.uf2
 
 # SPI flash demo
-sudo picotool load -fx ./example/pico-littlefs-flash-demo.uf2
+sudo picotool load -fx ./examples/pico-littlefs-flash-demo.uf2
 ```
 
 ### 4. Monitor

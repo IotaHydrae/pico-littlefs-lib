@@ -26,7 +26,7 @@ pico-littlefs-lib/
 ├── sdcard_port_pico.h / .c         # SD 卡硬件端口
 ├── flash_port_pico.h               # Flash 引脚配置
 ├── pico_littlefs.h / .c            # 可选的便利封装
-├── example/
+├── examples/
 │   ├── sdcard_demo.c               # SD 卡演示
 │   ├── sdcard_large_read.c         # SD 卡大文件读取基准测试
 │   ├── flash_demo.c                # SPI Flash 演示
@@ -60,13 +60,13 @@ ninja
 
 ```bash
 # SD 卡演示
-sudo picotool load -fx ./example/pico-littlefs-sdcard-demo.uf2
+sudo picotool load -fx ./examples/pico-littlefs-sdcard-demo.uf2
 
 # SD 卡大文件读取基准测试
-sudo picotool load -fx ./example/pico-littlefs-sdcard-large-read.uf2
+sudo picotool load -fx ./examples/pico-littlefs-sdcard-large-read.uf2
 
 # SPI Flash 演示
-sudo picotool load -fx ./example/pico-littlefs-flash-demo.uf2
+sudo picotool load -fx ./examples/pico-littlefs-flash-demo.uf2
 ```
 
 ### 4. 查看串口

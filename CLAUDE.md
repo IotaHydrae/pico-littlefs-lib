@@ -6,17 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 cd build && cmake -G Ninja .. && ninja                     # build
-sudo picotool load -fx ./example/pico-littlefs-sdcard-demo.uf2   # flash (SD)
-sudo picotool load -fx ./example/pico-littlefs-flash-demo.uf2    # flash (NOR)
+sudo picotool load -fx ./examples/pico-littlefs-sdcard-demo.uf2   # flash (SD)
+sudo picotool load -fx ./examples/pico-littlefs-flash-demo.uf2    # flash (NOR)
 minicom -D /dev/ttyACM0                                    # serial monitor
 ```
 
-`PICO_SDK_PATH` must be set. Build outputs `example/pico-littlefs-sdcard-demo.{elf,uf2}`, `pico-littlefs-sdcard-large-read.{elf,uf2}`, and `pico-littlefs-flash-demo.{elf,uf2}`.
+`PICO_SDK_PATH` must be set. Build outputs `examples/pico-littlefs-sdcard-demo.{elf,uf2}`, `pico-littlefs-sdcard-large-read.{elf,uf2}`, and `pico-littlefs-flash-demo.{elf,uf2}`.
 
 ## Architecture — three strict layers
 
 ```
-application (example/main.c)
+application (examples/sdcard_demo.c)
   │  calls lfs_file_* / lfs_dir_* / lfs_format / lfs_mount / lfs_unmount
   │
   ├── lfs.h  (littlefs core — lib/littlefs/)
@@ -94,9 +94,9 @@ pico_littlefs_core        (STATIC) — lfs.c + lfs_util.c, no deps
 pico_sdcard               (STATIC) — sdcard.c, from lib/sdcard-lib/
 pico_spi_flash            (STATIC) — flash.c + flash_nor.c, from lib/spi-flash-lib/
 pico_littlefs_bd          (STATIC) — lfs_bd_sdcard.c + lfs_bd_flash.c, links above
-pico-littlefs-sdcard-demo (EXEC)   — example/main.c + sdcard_port_pico.c
-pico-littlefs-sdcard-large-read (EXEC) — example/large_read.c
-pico-littlefs-flash-demo  (EXEC)   — example/flash_demo.c + flash_port_pico.c
+pico-littlefs-sdcard-demo (EXEC)   — examples/sdcard_demo.c + sdcard_port_pico.c
+pico-littlefs-sdcard-large-read (EXEC) — examples/sdcard_large_read.c
+pico-littlefs-flash-demo  (EXEC)   — examples/flash_demo.c + flash_port_pico.c
 ```
 
 ## Key dependencies
