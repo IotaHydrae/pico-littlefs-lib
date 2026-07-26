@@ -123,7 +123,7 @@ minicom -D /dev/ttyACM0
 | **默认 block_size** | 16384 (32 扇区) | 4096 |
 | **read/prog 对齐** | 512 字节 | 1 字节 |
 | **Erase** | no-op（卡自管理） | `spi_flash_erase_sector()` |
-| **读取速度** | ~600 KiB/s (SPI) | ~1 MiB/s (QSPI) |
+| **读取速度** | ~600 KiB/s (SPI) | ~1 MiB/s (SPI) |
 | **端口文件** | `sdcard_port_pico.c` | `flash_port_pico.c` |
 
 ## 移植新存储器件

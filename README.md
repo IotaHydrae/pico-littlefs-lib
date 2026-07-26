@@ -129,7 +129,7 @@ your application
 | **Default block_size** | 16384 (32 sectors) | 4096 (sector size) |
 | **read/prog alignment** | 512 bytes | 1 byte |
 | **Erase** | no-op (card-managed) | `spi_flash_erase_sector()` |
-| **Read speed** | ~600 KiB/s (SPI) | ~1 MiB/s (QSPI) |
+| **Read speed** | ~600 KiB/s (SPI) | ~1 MiB/s (SPI) |
 | **Port file** | `sdcard_port_pico.c` | `flash_port_pico.c` |
 
 ## Configuration
