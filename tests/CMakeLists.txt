@@ -19,6 +19,7 @@ set(FLASH_INCLUDES
 
 # ---- pico-flash-stress (SPI flash stability test) ----------------------
 add_executable(pico-flash-stress
+    stress_common.c
     flash_stress.c
     ${FLASH_PORT_SRC}
 )
