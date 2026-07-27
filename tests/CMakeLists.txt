@@ -26,6 +26,16 @@ add_executable(pico-flash-stress
 target_link_libraries(pico-flash-stress ${FLASH_LIBS})
 target_include_directories(pico-flash-stress PRIVATE ${FLASH_INCLUDES})
 
+# Run-time parameters (override via cmake -D)
+if(DEFINED STRESS_DURATION_HOURS)
+    target_compile_definitions(pico-flash-stress PRIVATE
+        DURATION_HOURS=${STRESS_DURATION_HOURS})
+endif()
+if(DEFINED STRESS_STATUS_INTERVAL_MIN)
+    target_compile_definitions(pico-flash-stress PRIVATE
+        STATUS_INTERVAL_MIN=${STRESS_STATUS_INTERVAL_MIN})
+endif()
+
 pico_enable_stdio_usb(pico-flash-stress 1)
 pico_enable_stdio_uart(pico-flash-stress 1)
 pico_add_extra_outputs(pico-flash-stress)

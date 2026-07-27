@@ -27,8 +27,12 @@
  * Configuration
  * ========================================================================= */
 
+#ifndef DURATION_HOURS
 #define DURATION_HOURS       24      /* 0 = run forever */
+#endif
+#ifndef STATUS_INTERVAL_MIN
 #define STATUS_INTERVAL_MIN  30      /* print status every N minutes */
+#endif
 #define TARGET_USAGE_PCT     70      /* keep flash ~70 % full */
 #define MAX_FILES            128     /* max live files at once */
 #define MIN_FILE_SIZE        256     /* smallest test file */
