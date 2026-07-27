@@ -31,6 +31,7 @@ pico-littlefs-lib/
 │   ├── sdcard_large_read.c         # SD card large-file read benchmark
 │   ├── flash_demo.c                # SPI flash demo
 │   └── CMakeLists.txt
+├── tests/                         # stability tests
 └── lib/
     ├── littlefs/                   # upstream littlefs (git submodule)
     ├── sdcard-lib/                 # SD card library (git submodule)
@@ -294,6 +295,36 @@ target_sources(pico_littlefs_bd PRIVATE ${CMAKE_CURRENT_LIST_DIR}/lfs_bd_mydevic
 
 - `lfs_bd_sdcard.c` — 512-byte sector I/O, CMD18 multi-block read, no-op erase
 - `lfs_bd_flash.c` — byte-level I/O, real erase, no-op sync
+
+## Tests
+
+`tests/` contains hardware-level stability tests.  Flash to the Pico and monitor via serial.
+
+### Flash Stress Test
+
+Repeatedly formats, writes, reads, verifies, and deletes files of random sizes on SPI NOR flash.  Designed to run unattended for hours to catch intermittent issues.
+
+```bash
+# Default: 24 hours, status every 30 minutes
+sudo picotool load -fx ./tests/pico-flash-stress.uf2
+
+# Quick smoke test: 1 hour, status every 5 minutes
+cmake -G Ninja -DSTRESS_DURATION_HOURS=1 -DSTRESS_STATUS_INTERVAL_MIN=5 ..
+ninja
+
+# Run indefinitely, status every 10 minutes
+cmake -G Ninja -DSTRESS_DURATION_HOURS=0 -DSTRESS_STATUS_INTERVAL_MIN=10 ..
+ninja
+```
+
+Operation mix (weighted, random):
+- 40 % read + byte-level verify (deterministic per-file pattern)
+- 25 % write-append (128 B – 2 KiB random extra data)
+- 15 % delete (triggers when flash usage exceeds 70 %)
+- 10 % create (256 B – 128 KiB random size, up to 128 files)
+- 10 % list root directory
+
+Status is written to both serial and `/var/stress_test_<compile_date>.log` on the flash filesystem.  The log file is synced after every write so data survives a power loss.
 
 ## PC Cross-Mounting (SD Card)
 

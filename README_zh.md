@@ -31,6 +31,7 @@ pico-littlefs-lib/
 │   ├── sdcard_large_read.c         # SD 卡大文件读取基准测试
 │   ├── flash_demo.c                # SPI Flash 演示
 │   └── CMakeLists.txt
+├── tests/                         # 稳定性测试
 └── lib/
     ├── littlefs/                   # littlefs 上游源码
     ├── sdcard-lib/                 # SD 卡库
@@ -230,6 +231,36 @@ target_sources(pico_littlefs_bd PRIVATE ${CMAKE_CURRENT_LIST_DIR}/lfs_bd_mydevic
 
 - `lfs_bd_sdcard.c` — 512 字节扇区 I/O、CMD18 多块读、空擦除
 - `lfs_bd_flash.c` — 字节级 I/O、真实擦除、空同步
+
+## 测试
+
+`tests/` 目录包含硬件级稳定性测试。
+
+### Flash 压力测试
+
+在 SPI NOR Flash 上反复格式化、写入、读取、校验和删除随机大小的文件，设计用于长时间无人值守运行以捕获间歇性问题。
+
+```bash
+# 默认：24 小时，每 30 分钟报告
+sudo picotool load -fx ./tests/pico-flash-stress.uf2
+
+# 快速冒烟：1 小时，每 5 分钟报告
+cmake -G Ninja -DSTRESS_DURATION_HOURS=1 -DSTRESS_STATUS_INTERVAL_MIN=5 ..
+ninja
+
+# 无限运行，每 10 分钟报告
+cmake -G Ninja -DSTRESS_DURATION_HOURS=0 -DSTRESS_STATUS_INTERVAL_MIN=10 ..
+ninja
+```
+
+操作混合（加权随机）：
+- 40 % 读取 + 逐字节校验（确定性 per-file pattern）
+- 25 % 追加写入（128 B – 2 KiB 随机额外数据）
+- 15 % 删除（Flash 使用率超过 70% 时触发）
+- 10 % 创建（256 B – 128 KiB 随机大小，最多 128 个文件）
+- 10 % 列出根目录
+
+状态同时输出到串口和 Flash 文件系统中的 `/var/stress_test_<编译日期>.log`。每次写入后立即同步，断电不丢日志。
 
 ## PC 跨平台挂载（SD 卡）
 
