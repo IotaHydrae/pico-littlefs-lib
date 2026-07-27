@@ -39,6 +39,12 @@
 #define MAX_FILE_SIZE        (128 * 1024)  /* largest test file */
 #define IO_CHUNK_SIZE        4096    /* read/write chunk size */
 
+/* Build log file path from compile-time date */
+#define STRINGIFY_(x) #x
+#define STRINGIFY(x)  STRINGIFY_(x)
+#define LOG_DIR        "/var"
+#define LOG_FILE       LOG_DIR "/stress_test_" __DATE__ ".log"
+
 /* =========================================================================
  * Static buffers
  * ========================================================================= */
@@ -74,6 +80,43 @@ typedef struct {
 } stats_t;
 
 static stats_t s;
+
+/* =========================================================================
+ * Log file  (writes to both serial and flash)
+ * ========================================================================= */
+
+static lfs_file_t s_log_file;
+static bool s_log_open = false;
+
+static int log_init(void)
+{
+	int err = lfs_mkdir(&lfs, LOG_DIR);
+	if (err != LFS_ERR_OK && err != LFS_ERR_EXIST)
+		return err;
+
+	err = lfs_file_open(&lfs, &s_log_file, LOG_FILE,
+			    LFS_O_WRONLY | LFS_O_CREAT | LFS_O_APPEND);
+	if (err == LFS_ERR_OK)
+		s_log_open = true;
+	return err;
+}
+
+static void log_write(const char *msg)
+{
+	printf("%s", msg);
+	if (s_log_open) {
+		lfs_file_write(&lfs, &s_log_file, msg, strlen(msg));
+		lfs_file_sync(&lfs, &s_log_file);  /* crash-safe */
+	}
+}
+
+static void log_close(void)
+{
+	if (s_log_open) {
+		lfs_file_close(&lfs, &s_log_file);
+		s_log_open = false;
+	}
+}
 
 /* =========================================================================
  * Helpers
@@ -300,7 +343,9 @@ static void print_status(void)
 	uint32_t hr = min / 60;
 	uint32_t mn = min % 60;
 
-	printf("\n---- Status  %3" PRIu32 "h%02" PRIu32 "m  "
+	char buf[256];
+	int n = snprintf(buf, sizeof(buf),
+	       "\n---- Status  %3" PRIu32 "h%02" PRIu32 "m  "
 	       "ops:%" PRIu32 "  err:%" PRIu32 "  files:%" PRIu32
 	       "  usage:%d%% ----\n"
 	       "     create:%" PRIu32 " write:%" PRIu32 " read:%" PRIu32
@@ -313,6 +358,8 @@ static void print_status(void)
 	       s.ops_delete, s.ops_list,
 	       s.bytes_written / 1024, s.bytes_read / 1024,
 	       s.verify_errors);
+	if (n > 0 && n < (int)sizeof(buf))
+		log_write(buf);
 }
 
 /* =========================================================================
@@ -495,6 +542,13 @@ int main(void)
 	       cfg.block_count,
 	       (uint32_t)((uint64_t)cfg.block_count * cfg.block_size / 1024));
 
+	/* ---- Init log file on flash ------------------------------------- */
+	err = log_init();
+	if (err != LFS_ERR_OK)
+		printf("  WARNING: log file create FAIL (%s) — "
+		       "continuing without flash log\n",
+		       lfs_str(err));
+
 	/* ---- 3. Run ---------------------------------------------------- */
 	printf("[3/3] Running");
 	if (DURATION_HOURS > 0)
@@ -532,24 +586,40 @@ int main(void)
 	}
 
 	/* ---- Final summary --------------------------------------------- */
-	lfs_unmount(&lfs);
+	{
+		char buf[512];
+		int n = snprintf(buf, sizeof(buf),
+			"\n========================================\n"
+			"  Test finished.\n\n"
+			"  Duration:  %" PRIu32 " min\n"
+			"  Total ops: %" PRIu32 "\n"
+			"  Create: %" PRIu32 "  Write: %" PRIu32
+			"  Read: %" PRIu32 "  Delete: %" PRIu32 "\n"
+			"  Data written: %" PRIu32
+			" KiB   read: %" PRIu32 " KiB\n"
+			"  Peak files:   %" PRIu32 "\n",
+			elapsed_min(), s.ops_total,
+			s.ops_create, s.ops_write, s.ops_read, s.ops_delete,
+			s.bytes_written / 1024, s.bytes_read / 1024,
+			s.max_files_seen);
+		if (n > 0 && n < (int)sizeof(buf))
+			log_write(buf);
+	}
 
-	printf("\n========================================\n");
-	printf("  Test finished.\n\n");
-	printf("  Duration:  %" PRIu32 " min\n", elapsed_min());
-	printf("  Total ops: %" PRIu32 "\n", s.ops_total);
-	printf("  Create: %" PRIu32 "  Write: %" PRIu32 "  Read: %" PRIu32
-	       "  Delete: %" PRIu32 "\n",
-	       s.ops_create, s.ops_write, s.ops_read, s.ops_delete);
-	printf("  Data written: %" PRIu32 " KiB   read: %" PRIu32 " KiB\n",
-	       s.bytes_written / 1024, s.bytes_read / 1024);
-	printf("  Peak files:   %" PRIu32 "\n", s.max_files_seen);
-	if (s.verify_errors > 0 || s.fs_errors > 0)
-		printf("  ERRORS — verify:%" PRIu32 "  fs:%" PRIu32 "\n",
-		       s.verify_errors, s.fs_errors);
-	else
-		printf("  Errors: 0  —  flash is stable.\n");
-	printf("========================================\n\n");
+	if (s.verify_errors > 0 || s.fs_errors > 0) {
+		char ebuf[64];
+		int n = snprintf(ebuf, sizeof(ebuf),
+			"  ERRORS — verify:%" PRIu32 "  fs:%" PRIu32 "\n",
+			s.verify_errors, s.fs_errors);
+		if (n > 0 && n < (int)sizeof(ebuf))
+			log_write(ebuf);
+	} else {
+		log_write("  Errors: 0  —  flash is stable.\n");
+	}
+	log_write("========================================\n\n");
+
+	log_close();
+	lfs_unmount(&lfs);
 
 	for (;;)
 		sleep_ms(1000);
