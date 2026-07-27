@@ -75,7 +75,11 @@ int stress_fs_usage_pct(void)
 {
 	lfs_ssize_t used = lfs_fs_size(&s_lfs);
 	if (used < 0) return 100;
-	return (int)((uint64_t)used * 100 / s_cfg.block_count);
+	if (s_cfg.block_count == 0) return 0;
+	/* Show fractional permille for large devices where sub-1% is common */
+	uint32_t bp1000 = (uint32_t)((uint64_t)used * 1000 / s_cfg.block_count);
+	/* round up: display 1% once we cross 0.5% */
+	return (int)((bp1000 + 5) / 10);
 }
 
 void stress_print_status(void)

@@ -47,4 +47,8 @@ foreach(TARGET pico-flash-stress pico-sdcard-stress)
         target_compile_definitions(${TARGET} PRIVATE
             STATUS_INTERVAL_MIN=${STRESS_STATUS_INTERVAL_MIN})
     endif()
+    if(DEFINED STRESS_MAX_FILE_SIZE)
+        target_compile_definitions(${TARGET} PRIVATE
+            MAX_FILE_SIZE=${STRESS_MAX_FILE_SIZE})
+    endif()
 endforeach()
