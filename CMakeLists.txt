@@ -78,6 +78,7 @@ endif()
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     # ---- Scenario A ------------------------------------------------------
     add_subdirectory(examples)
+    add_subdirectory(tests)
 
 elseif(TARGET pico_stdlib)
     # ---- Scenario B: submodule in a Pico project -------------------------
